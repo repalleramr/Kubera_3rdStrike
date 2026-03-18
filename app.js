@@ -156,7 +156,7 @@ function showToast(title,text,kind=''){
   const layer=q('toastLayer'); const el=document.createElement('div'); el.className=`toast ${kind}`; el.innerHTML=`<div class="title">${title}</div><div>${text}</div>`; layer.appendChild(el); setTimeout(()=>el.remove(),3600);
 }
 function glowKey(el){ if(!el) return; el.classList.remove('key-glow'); void el.offsetWidth; el.classList.add('key-glow'); setTimeout(()=>el.classList.remove('key-glow'),220); }
-function statusCode(info){ if(!info) return '0'; if(info.status==='A') return `S${Math.max(1, Number(info.step)||0)}`; if(info.status==='B') return 'B'; return info.status; }
+function statusCode(info){ if(!info) return '0'; if(info.status==='A') return `S${Math.max(1, Number(info.step)||0)}`; if(info.status==='B') return 'B'; if(info.status==='I' && info.pendingSecond) return '2X'; return info.status; }
 function vijayDarshanaDisplay(info){ const bet=currentBetFor(info); const displayStep=Math.max(1,(Number(info.step)||1)-1); const displayNet=(bet*9)-(Number(info.prevLoss)||0); return { bet, displayStep, displayNet }; }
 
 function renderBoards(){
@@ -281,7 +281,12 @@ async function resolveNumber(side,num,notes,rowEvents){ const info=state.numbers
     info.status='B'; info.ladder=2; info.step=1; info.pendingSecond=false; if(rowEvents) rowEvents.ret.push(`${side}${num}`); notes.push({title:'CAP RETURNED',text:`${side}${num} back on track`,kind:'warn'}); return;
   }
   if(info.status==='I'){
-    info.status='A'; info.step=0; info.ladder=1; info.activeAt=state.currentChakra; info.prevLoss=0; return;
+    if(!info.pendingSecond){
+      info.pendingSecond=true;
+      info.activeAt=state.currentChakra;
+      return;
+    }
+    info.status='A'; info.step=0; info.ladder=1; info.activeAt=state.currentChakra; info.prevLoss=0; info.pendingSecond=false; return;
   }
   const bet=currentBetFor(info); const totalReturn=bet*9; const net=(bet*8)-info.prevLoss;
   state.liveBankroll += totalReturn;
@@ -401,11 +406,17 @@ function resolveNumberSilent(side,num,rowEvents,shouldReturnFromCap=false){
     return;
   }
   if(info.status==='I'){
+    if(!info.pendingSecond){
+      info.pendingSecond=true;
+      info.activeAt=state.currentChakra;
+      return;
+    }
     info.status='A';
     info.step=0;
     info.ladder=1;
     info.activeAt=state.currentChakra;
     info.prevLoss=0;
+    info.pendingSecond=false;
     return;
   }
   const bet=currentBetFor(info);
@@ -594,7 +605,7 @@ function granthCsvContent(){
   return header + rows.join('\n');
 }
 async function saveWithPicker(name,content,type){ if(window.showSaveFilePicker){ try{ const handle=await window.showSaveFilePicker({ suggestedName:name, types:[{ description:type.includes('json') ? 'JSON Files' : 'CSV Files', accept:{ [type]: [name.endsWith('.json') ? '.json' : '.csv'] } }] }); const writable=await handle.createWritable(); await writable.write(content); await writable.close(); return true; }catch(err){ if(err && err.name==='AbortError') return null; } } return false; }
-function exportPayload(){ return { app:'Kubera_V5Pro Final locked', version:'Kubera_V5Pro Final locked', exportedAt:new Date().toISOString(), state, pending, historyStack, redoStack }; }
+function exportPayload(){ return { app:'Kubera ThirdStrike', version:'Kubera ThirdStrike', exportedAt:new Date().toISOString(), state, pending, historyStack, redoStack }; }
 async function exportGranthJson(){ const content=JSON.stringify(exportPayload(),null,2); const saved=await saveWithPicker('Kubera_V5Pro_Final_locked.json',content,'application/json'); if(saved===null) return; if(!saved) downloadFile('Kubera_V5Pro_Final_locked.json',content,'application/json'); }
 async function exportGranthCsv(){ const content=granthCsvContent(); const saved=await saveWithPicker('Kubera_V5Pro_Final_locked.csv',content,'text/csv'); if(saved===null) return; if(!saved) downloadFile('Kubera_V5Pro_Final_locked.csv',content,'text/csv'); }
 function importGranthJson(e){ const file=e.target.files[0]; if(!file) return; file.text().then(text=>{ const name=(file.name||'').toLowerCase(); const trimmed=text.trim(); if(name.endsWith('.csv') || trimmed.startsWith('KumbhId,')){
